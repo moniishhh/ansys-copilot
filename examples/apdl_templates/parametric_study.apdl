@@ -1,0 +1,71 @@
+! ============================================================
+! Parametric Study — Cantilever Beam Thickness Variation
+! Varies beam height H from 0.05 m to 0.20 m in 4 steps
+! Records tip displacement and max von Mises stress
+! ============================================================
+
+/TITLE, Parametric Thickness Study — Cantilever Beam
+
+! ---- Fixed parameters ----
+L      = 1.0       ! Beam length (m)
+W      = 0.05      ! Beam width (m)
+F_TIP  = -5000     ! Tip load (N)
+EX     = 200E9     ! Young's modulus (Pa)
+PRXY   = 0.3       ! Poisson's ratio
+
+! ---- Parametric range ----
+N_STEPS = 4
+H_START = 0.05
+H_END   = 0.20
+H_INC   = (H_END - H_START) / (N_STEPS - 1)
+
+! ---- Arrays to store results ----
+*DIM,H_ARR,ARRAY,N_STEPS
+*DIM,UMAX_ARR,ARRAY,N_STEPS
+*DIM,SMAX_ARR,ARRAY,N_STEPS
+
+*DO,I,1,N_STEPS
+  H = H_START + (I-1)*H_INC
+  H_ARR(I) = H
+
+  /PREP7
+  ET,1,SOLID185
+  MP,EX,1,EX
+  MP,PRXY,1,PRXY
+  BLC4,0,0,L,H,W
+  ESIZE,H/4
+  VMESH,ALL
+  NSEL,S,LOC,X,0
+  D,ALL,ALL,0
+  ALLSEL,ALL
+  NSEL,S,LOC,X,L
+  F,ALL,FY,F_TIP/NDINQR(0,13)
+  ALLSEL,ALL
+  FINISH
+
+  /SOLU
+  ANTYPE,STATIC
+  SOLVE
+  FINISH
+
+  /POST1
+  SET,LAST
+  NSORT,U,Y,0,1
+  *GET,UMAX_ARR(I),SORT,,MAX
+  ESORT,EPTO,EQV
+  *GET,SMAX_ARR(I),SORT,,MAX
+  FINISH
+
+  /CLEAR,NOSTART    ! Clear model for next iteration
+
+*ENDDO
+
+! ---- Print results table ----
+/COM,
+/COM, ===== Parametric Study Results =====
+/COM, Height(m)   Tip Disp(m)   Max Stress(Pa)
+/COM, ------------------------------------
+*DO,I,1,N_STEPS
+  *MSG,UI,H_ARR(I),UMAX_ARR(I),SMAX_ARR(I)
+  %G          %G          %G
+*ENDDO

@@ -1,0 +1,67 @@
+! ============================================================
+! Modal Analysis — Flat Plate (Free Vibration)
+! Element: SHELL181  |  Material: Aluminum
+! Extracts first 10 natural frequencies
+! ============================================================
+
+/TITLE, Modal Analysis of Aluminum Plate
+
+! ---- Parameters ----
+PL   = 0.5       ! Plate length (m)
+PW   = 0.3       ! Plate width (m)
+TH   = 0.003     ! Plate thickness (m)
+NMODES = 10      ! Number of modes to extract
+
+EX_AL   = 70E9   ! Young's modulus — Aluminum (Pa)
+PRXY_AL = 0.33   ! Poisson's ratio
+DENS_AL = 2700   ! Density (kg/m^3)
+
+/PREP7
+! ---- Element type ----
+ET,1,SHELL181              ! 4-node shell element
+KEYOPT,1,3,2               ! Full integration with incompatible modes
+
+! ---- Section (thickness) ----
+SECTYPE,1,SHELL
+SECDATA,TH,1,0.0,3         ! Thickness, material, angle, integration points
+
+! ---- Material properties (Aluminum) ----
+MP,EX,1,EX_AL
+MP,PRXY,1,PRXY_AL
+MP,DENS,1,DENS_AL
+
+! ---- Geometry: rectangular area ----
+BLC4,0,0,PL,PW
+
+! ---- Mesh ----
+ESIZE,PL/20               ! ~20 elements along length
+MSHKEY,0                  ! Free meshing
+AMESH,ALL
+
+! ---- Boundary conditions: simply supported on all edges ----
+LSEL,S,LINE,,ALL
+DL,ALL,,UZ,0              ! Constrain out-of-plane displacement
+ALLSEL,ALL
+
+FINISH
+
+/SOLU
+! ---- Modal analysis settings ----
+ANTYPE,MODAL
+MODOPT,LANB,NMODES         ! Block Lanczos, extract NMODES modes
+MXPAND,NMODES              ! Expand all modes
+LUMPM,0                    ! Consistent mass matrix
+SOLVE
+FINISH
+
+/POST1
+! ---- List natural frequencies ----
+SET,LIST                   ! Print mode number and frequency table
+
+! ---- Plot first 3 mode shapes ----
+*DO,I,1,3
+  SET,1,I
+  PLNSOL,U,SUM,0           ! Plot total displacement for mode I
+*ENDDO
+
+FINISH

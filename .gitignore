@@ -1,0 +1,52 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Node / JS
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+
+# Vector database
+chroma_db/
+
+# Knowledge base data (keep .gitkeep placeholders)
+backend/knowledge_base/data/*.pdf
+backend/knowledge_base/data/*.txt
+backend/knowledge_base/data/*.md
+!backend/knowledge_base/data/.gitkeep
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Docker
+*.override.yml
