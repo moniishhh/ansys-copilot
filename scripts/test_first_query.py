@@ -9,8 +9,17 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
-from langchain_community.vectorstores import Chroma
+
+try:
+    from langchain_core.prompts import PromptTemplate
+except ImportError:
+    from langchain.prompts import PromptTemplate
+
+try:
+    from langchain_chroma import Chroma
+except ImportError:
+    from langchain_community.vectorstores import Chroma
+
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 load_dotenv()
