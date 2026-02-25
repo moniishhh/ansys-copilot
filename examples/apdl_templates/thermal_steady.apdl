@@ -1,0 +1,66 @@
+! ============================================================
+! Steady-State Thermal Analysis — Rectangular Block
+! Element: SOLID70  |  Material: Copper
+! Temperature BCs on opposite faces
+! ============================================================
+
+/TITLE, Steady-State Thermal Analysis — Copper Block
+
+! ---- Parameters ----
+BL = 0.1          ! Block length x (m)
+BW = 0.05         ! Block width  y (m)
+BH = 0.05         ! Block height z (m)
+T_HOT  = 100      ! Temperature on hot face (°C)
+T_COLD = 20       ! Temperature on cold face (°C)
+KXX_CU = 385      ! Thermal conductivity — Copper (W/m·K)
+
+/PREP7
+! ---- Element type (3-D thermal solid) ----
+ET,1,SOLID70
+
+! ---- Material properties (Copper) ----
+MP,KXX,1,KXX_CU
+
+! ---- Geometry ----
+BLC4,0,0,BL,BH,BW
+
+! ---- Mesh ----
+ESIZE,BL/10
+VMESH,ALL
+
+! ---- Boundary conditions ----
+! Hot face at x=0
+NSEL,S,LOC,X,0
+D,ALL,TEMP,T_HOT
+
+! Cold face at x=BL
+NSEL,S,LOC,X,BL
+D,ALL,TEMP,T_COLD
+
+ALLSEL,ALL
+FINISH
+
+/SOLU
+! ---- Thermal steady-state ----
+ANTYPE,STEADY         ! Steady-state thermal
+SOLVE
+FINISH
+
+/POST1
+! ---- Post-processing ----
+SET,LAST
+
+! Plot temperature distribution
+PLNSOL,TEMP,,0
+
+! Plot heat flux magnitude
+PLNSOL,TF,SUM,0
+
+! Print temperature along centreline
+PATH,CENTRELINE,2,30,20
+PPATH,1,,0,BH/2,BW/2
+PPATH,2,,BL,BH/2,BW/2
+PDEF,TEMP,TEMP,,AVG
+PLPATH,TEMP
+
+FINISH

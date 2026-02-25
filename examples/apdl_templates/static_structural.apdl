@@ -1,0 +1,62 @@
+! ============================================================
+! Static Structural Analysis — Cantilever Beam with Tip Load
+! Element: SOLID185  |  Material: Steel
+! ============================================================
+
+/TITLE, Cantilever Beam Static Structural Analysis
+
+! ---- Parameters ----
+L    = 1.0        ! Beam length (m)
+W    = 0.05       ! Beam width (m)
+H    = 0.1        ! Beam height (m)
+F_TIP = -10000    ! Tip load in Y direction (N)
+EX_STEEL = 200E9  ! Young's modulus (Pa)
+PRXY_STEEL = 0.3  ! Poisson's ratio
+
+/PREP7
+! ---- Element type ----
+ET,1,SOLID185          ! 3-D 8-node structural solid
+
+! ---- Material properties (Steel) ----
+MP,EX,1,EX_STEEL
+MP,PRXY,1,PRXY_STEEL
+
+! ---- Geometry: block (length x width x height) ----
+BLC4,0,0,L,H,W         ! BLOCK from origin
+
+! ---- Mesh ----
+ESIZE,H/4              ! Element size = H/4
+VMESH,ALL              ! Mesh all volumes
+
+! ---- Boundary conditions: fixed support at x=0 ----
+NSEL,S,LOC,X,0
+D,ALL,ALL,0            ! Fully fixed (all DOF = 0)
+ALLSEL,ALL
+
+! ---- Apply tip load at x=L ----
+NSEL,S,LOC,X,L
+F,ALL,FY,F_TIP/NDINQR(0,13)  ! Distribute load over tip nodes
+ALLSEL,ALL
+
+FINISH
+
+/SOLU
+! ---- Solution settings ----
+ANTYPE,STATIC          ! Static analysis
+SOLVE
+FINISH
+
+/POST1
+! ---- Post-processing ----
+SET,LAST               ! Read last load step
+
+PLDISP,1               ! Plot deformed shape with undeformed overlay
+PLNSOL,U,Y,0           ! Nodal Y-displacement contour
+PLNSOL,S,EQV,0         ! Von Mises equivalent stress contour
+
+! ---- Print maximum displacement ----
+NSORT,U,Y,0,1
+*GET,UMAX,SORT,,MAX
+/COM, Maximum Y-displacement: %UMAX% m
+
+FINISH
