@@ -1,10 +1,29 @@
-"""Streamlit MVP chat UI for ANSYS Copilot."""
+"""Streamlit MVP chat UI for ANSYS Copilot, directly calling backend services."""
 
-import requests
 import streamlit as st
 
-# Backend API base URL
-API_BASE = "http://localhost:8000"
+from backend.services.code_generator import CodeGenerator
+from backend.services.rag_engine import RAGEngine
+from backend.services.troubleshooter import Troubleshooter
+
+
+# ── Lazy initialization of ML models and backend services ─────────────────────
+@st.cache_resource
+def get_rag_engine():
+    engine = RAGEngine()
+    engine.initialize()
+    return engine
+
+
+@st.cache_resource
+def get_code_generator():
+    return CodeGenerator()
+
+
+@st.cache_resource
+def get_troubleshooter():
+    return Troubleshooter()
+
 
 # ── Page configuration ────────────────────────────────────────────────────────
 st.set_page_config(
@@ -65,7 +84,7 @@ for msg in st.session_state.messages:
             st.markdown(msg["content"])
 
 # Chat input
-user_input = st.chat_input(f"Ask me anything about ANSYS…")
+user_input = st.chat_input("Ask me anything about ANSYS…")
 
 if user_input:
     # Display user message
@@ -73,19 +92,15 @@ if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Call the appropriate backend endpoint
+    # Call the appropriate backend endpoint directly
     with st.chat_message("assistant"):
         with st.spinner("Thinking…"):
             try:
                 if mode == "General Q&A":
-                    resp = requests.post(
-                        f"{API_BASE}/chat",
-                        json={"message": user_input, "conversation_history": []},
-                        timeout=60,
-                    )
-                    resp.raise_for_status()
-                    answer = resp.json()["response"]
-                    sources = resp.json().get("sources", [])
+                    rag = get_rag_engine()
+                    result = rag.query(user_input)
+                    answer = result["answer"]
+                    sources = result.get("sources", [])
                     st.markdown(answer)
                     if sources:
                         with st.expander("📚 Sources"):
@@ -94,25 +109,20 @@ if user_input:
                     st.session_state.messages.append({"role": "assistant", "content": answer})
 
                 elif mode in ("Generate APDL Script", "Generate PyMAPDL Script"):
-                    script_type = "apdl" if mode == "Generate APDL Script" else "pymapdl"
-                    resp = requests.post(
-                        f"{API_BASE}/generate-script",
-                        json={
-                            "description": user_input,
-                            "script_type": script_type,
-                            "analysis_type": analysis_type,
-                        },
-                        timeout=90,
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
-                    lang = data["language"]
-                    code = data["code"]
-                    explanation = data.get("explanation", "")
+                    generator = get_code_generator()
+                    if mode == "Generate APDL Script":
+                        result = generator.generate_apdl(user_input, analysis_type)
+                    else:
+                        result = generator.generate_pymapdl(user_input, analysis_type)
+
+                    lang = result["language"]
+                    code = result["code"]
+                    explanation = result.get("explanation", "")
 
                     if explanation:
                         st.markdown(explanation)
                     st.code(code, language=lang)
+                    
                     st.session_state.messages.append(
                         {"role": "assistant", "content": code, "is_code": True, "language": lang}
                     )
@@ -120,21 +130,17 @@ if user_input:
                         st.session_state.messages.append({"role": "assistant", "content": explanation})
 
                 elif mode == "Troubleshoot":
-                    resp = requests.post(
-                        f"{API_BASE}/troubleshoot",
-                        json={
-                            "problem": user_input,
-                            "analysis_type": analysis_type,
-                            "error_message": error_message,
-                            "current_settings": current_settings,
-                        },
-                        timeout=90,
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
-                    diagnosis = data["diagnosis"]
-                    solutions = data["solutions"]
-                    recommended = data.get("recommended_settings", "")
+                    troubleshooter = get_troubleshooter()
+                    context = {
+                        "analysis_type": analysis_type,
+                        "error_message": error_message,
+                        "current_settings": current_settings,
+                    }
+                    result = troubleshooter.diagnose(user_input, context)
+                    
+                    diagnosis = result["diagnosis"]
+                    solutions = result["solutions"]
+                    recommended = result.get("recommended_settings", "")
 
                     st.markdown(f"**🔍 Diagnosis**\n\n{diagnosis}")
                     st.markdown("**✅ Solutions**")
@@ -149,9 +155,5 @@ if user_input:
                     )
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
 
-            except requests.exceptions.ConnectionError:
-                st.error("❌ Cannot connect to the backend. Make sure the FastAPI server is running on port 8000.")
-            except requests.exceptions.HTTPError as exc:
-                st.error(f"❌ Backend error: {exc.response.text}")
             except Exception as exc:
-                st.error(f"❌ Unexpected error: {exc}")
+                st.error(f"❌ Unexpected error within backend models: {exc}")
