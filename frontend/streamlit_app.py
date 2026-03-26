@@ -1,5 +1,14 @@
 """Streamlit MVP chat UI for ANSYS Copilot, directly calling backend services."""
 
+import os
+import sys
+from pathlib import Path
+
+# Fix sys.path for Streamlit Cloud to find the `backend` package
+root_dir = Path(__file__).resolve().parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
+    
 import streamlit as st
 
 from backend.services.code_generator import CodeGenerator
