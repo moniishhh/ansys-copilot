@@ -9,13 +9,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # LLM settings
-    openai_api_key: str = ""
-    model_name: str = "gpt-4o"
+    gemini_api_key: str = ""
+    model_name: str = "gemini-2.5-flash"
     temperature: float = 0.1
     max_tokens: int = 4096
 
     # Embedding & vector store settings
-    embedding_model: str = "text-embedding-3-small"
+    embedding_model: str = "all-MiniLM-L6-v2"
     chroma_persist_dir: str = "./chroma_db"
 
 

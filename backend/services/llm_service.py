@@ -1,23 +1,24 @@
-"""LLM interaction layer supporting OpenAI-compatible models."""
+"""LLM interaction layer using Google Gemini via LangChain."""
 
-from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
+
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from backend.config import settings
 
 
 class LLMService:
-    """Thin wrapper around LangChain's ChatOpenAI client.
+    """Thin wrapper around LangChain's ChatGoogleGenerativeAI client.
 
     Provides a simple ``generate`` interface used by other services.
     """
 
     def __init__(self) -> None:
-        self._llm = ChatOpenAI(
+        self._llm = ChatGoogleGenerativeAI(
             model=settings.model_name,
             temperature=settings.temperature,
-            max_tokens=settings.max_tokens,
-            openai_api_key=settings.openai_api_key,
+            max_output_tokens=settings.max_tokens,
+            google_api_key=settings.gemini_api_key,
         )
 
     def generate(self, prompt: str, system_prompt: str = "") -> str:
@@ -30,10 +31,12 @@ class LLMService:
         Returns:
             The model's text response.
         """
-        messages = []
+        # Gemini works best with a single unified prompt;
+        # prepend any system instruction directly into the message.
         if system_prompt:
-            messages.append(SystemMessage(content=system_prompt))
-        messages.append(HumanMessage(content=prompt))
+            full_prompt = f"{system_prompt}\n\n{prompt}"
+        else:
+            full_prompt = prompt
 
-        response = self._llm.invoke(messages)
+        response = self._llm.invoke([HumanMessage(content=full_prompt)])
         return response.content

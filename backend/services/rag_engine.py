@@ -1,12 +1,30 @@
-"""RAG engine using LangChain and ChromaDB for ANSYS knowledge retrieval."""
+"""RAG engine using LangChain, HuggingFace embeddings, and ChromaDB for ANSYS knowledge retrieval."""
 
 from pathlib import Path
 
-from langchain.chains import RetrievalQA
-from langchain_community.vectorstores import Chroma
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from backend.config import settings
+
+RAG_PROMPT_TEMPLATE = """You are an expert ANSYS simulation engineer.
+Use the following retrieved context to answer the question.
+If the context doesn't contain enough information, rely on your general ANSYS knowledge.
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+
+
+def _format_docs(docs) -> str:
+    return "\n\n".join(doc.page_content for doc in docs)
 
 
 class RAGEngine:
@@ -14,17 +32,20 @@ class RAGEngine:
 
     On first use, if the vector store is empty or absent, queries fall back
     to pure LLM generation without retrieval context.
+
+    Embeddings are computed locally using a HuggingFace sentence-transformers
+    model (all-MiniLM-L6-v2 by default) — no embedding API key required.
     """
 
     def __init__(self) -> None:
-        self._qa_chain: RetrievalQA | None = None
+        self._chain = None
         self._vectorstore: Chroma | None = None
+        self._retriever = None
 
     def initialize(self) -> None:
-        """Set up the embedding model, vector store, and QA chain."""
-        embeddings = OpenAIEmbeddings(
-            model=settings.embedding_model,
-            openai_api_key=settings.openai_api_key,
+        """Set up the embedding model, vector store, and RAG chain."""
+        embeddings = HuggingFaceEmbeddings(
+            model_name=settings.embedding_model,
         )
 
         persist_dir = Path(settings.chroma_persist_dir)
@@ -36,18 +57,22 @@ class RAGEngine:
             persist_directory=str(persist_dir),
         )
 
-        llm = ChatOpenAI(
+        llm = ChatGoogleGenerativeAI(
             model=settings.model_name,
             temperature=settings.temperature,
-            max_tokens=settings.max_tokens,
-            openai_api_key=settings.openai_api_key,
+            max_output_tokens=settings.max_tokens,
+            google_api_key=settings.gemini_api_key,
         )
 
-        self._qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=self._vectorstore.as_retriever(search_kwargs={"k": 5}),
-            return_source_documents=True,
+        prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
+        self._retriever = self._vectorstore.as_retriever(search_kwargs={"k": 5})
+
+        # Modern LCEL RAG chain (replaces deprecated RetrievalQA)
+        self._chain = (
+            {"context": self._retriever | _format_docs, "question": RunnablePassthrough()}
+            | prompt
+            | llm
+            | StrOutputParser()
         )
 
     def query(self, question: str, k: int = 5) -> dict:
@@ -60,12 +85,15 @@ class RAGEngine:
         Returns:
             Dictionary with keys ``answer`` and ``sources``.
         """
-        if self._qa_chain is None:
+        if self._chain is None:
             self.initialize()
 
-        result = self._qa_chain.invoke({"query": question})
-        sources = [
-            doc.metadata.get("source", "")
-            for doc in result.get("source_documents", [])
-        ]
-        return {"answer": result["result"], "sources": sources}
+        answer = self._chain.invoke(question)
+
+        # Retrieve source metadata separately
+        sources = []
+        if self._retriever:
+            docs = self._retriever.invoke(question)
+            sources = [doc.metadata.get("source", "") for doc in docs]
+
+        return {"answer": answer, "sources": sources}

@@ -32,6 +32,7 @@ yarn-debug.log*
 
 # Vector database
 chroma_db/
+backend/knowledge_base/faiss_index/
 
 # Knowledge base data (keep .gitkeep placeholders)
 backend/knowledge_base/data/*.pdf
