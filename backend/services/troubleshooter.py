@@ -1,9 +1,14 @@
 """Convergence and mesh troubleshooting service."""
 
+from pydantic import BaseModel, Field
 from backend.prompts.system_prompts import ANSYS_EXPERT_PROMPT
 from backend.prompts.troubleshoot_prompts import CONVERGENCE_PROMPT, MESH_QUALITY_PROMPT
 from backend.services.llm_service import LLMService
 
+class TroubleshootResult(BaseModel):
+    diagnosis: str = Field(description="Explanation of the root cause of the convergence/mesh issue in 2-3 sentences.")
+    solutions: list[str] = Field(description="A list of recommended fixes.")
+    recommended_settings: str = Field(description="Specific APDL commands or PyMAPDL calls to apply the fixes.")
 
 class Troubleshooter:
     """Diagnoses ANSYS simulation problems and recommends fixes."""
@@ -37,54 +42,9 @@ class Troubleshooter:
             current_settings=context.get("current_settings", "none"),
         )
 
-        raw = self._llm.generate(prompt, system_prompt=ANSYS_EXPERT_PROMPT)
-        return self._parse_response(raw)
-
-    @staticmethod
-    def _parse_response(raw: str) -> dict:
-        """Parse the structured LLM response into a result dictionary.
-
-        The model is prompted to return sections labelled **Diagnosis**,
-        **Solutions**, and **Recommended Settings**.
-
-        Args:
-            raw: Raw LLM response text.
-
-        Returns:
-            Parsed dictionary with ``diagnosis``, ``solutions``, and
-            ``recommended_settings`` keys.
-        """
-        diagnosis = ""
-        solutions: list[str] = []
-        recommended_settings = ""
-
-        section = None
-        for line in raw.splitlines():
-            stripped = line.strip()
-            lower = stripped.lower()
-            if "diagnosis" in lower and stripped.startswith("**"):
-                section = "diagnosis"
-                continue
-            if "solution" in lower and stripped.startswith("**"):
-                section = "solutions"
-                continue
-            if "recommended" in lower and stripped.startswith("**"):
-                section = "settings"
-                continue
-
-            if section == "diagnosis" and stripped:
-                diagnosis += stripped + " "
-            elif section == "solutions" and stripped.startswith(("-", "*", "•")):
-                solutions.append(stripped.lstrip("-*• "))
-            elif section == "settings" and stripped:
-                recommended_settings += stripped + "\n"
-
-        # Fallback: return whole response as diagnosis if parsing found nothing
-        if not diagnosis and not solutions:
-            diagnosis = raw.strip()
-
+        result: TroubleshootResult = self._llm.generate_structured(prompt, TroubleshootResult, system_prompt=ANSYS_EXPERT_PROMPT)
         return {
-            "diagnosis": diagnosis.strip(),
-            "solutions": solutions or [raw.strip()],
-            "recommended_settings": recommended_settings.strip(),
+            "diagnosis": result.diagnosis,
+            "solutions": result.solutions,
+            "recommended_settings": result.recommended_settings,
         }

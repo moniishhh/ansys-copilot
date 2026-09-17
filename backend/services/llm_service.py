@@ -40,3 +40,23 @@ class LLMService:
 
         response = self._llm.invoke([HumanMessage(content=full_prompt)])
         return response.content
+        
+    def generate_structured(self, prompt: str, schema: type, system_prompt: str = ""):
+        """Send a prompt to the LLM and return a parsed Pydantic object.
+
+        Args:
+            prompt: The user-facing prompt / question.
+            schema: The Pydantic model class to parse into.
+            system_prompt: Optional system-level instruction to prepend.
+
+        Returns:
+            An instance of the provided Pydantic schema.
+        """
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n{prompt}"
+        else:
+            full_prompt = prompt
+            
+        structured_llm = self._llm.with_structured_output(schema)
+        response = structured_llm.invoke([HumanMessage(content=full_prompt)])
+        return response

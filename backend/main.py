@@ -18,6 +18,7 @@ async def lifespan(app: FastAPI):
     global rag_engine
     rag_engine = RAGEngine()
     rag_engine.initialize()
+    app.state.rag_engine = rag_engine
     yield
     # Cleanup (if needed) goes here
 

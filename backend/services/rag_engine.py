@@ -1,5 +1,6 @@
 """RAG engine using LangChain, HuggingFace embeddings, and ChromaDB for ANSYS knowledge retrieval."""
 
+from operator import itemgetter
 from pathlib import Path
 
 from langchain_chroma import Chroma
@@ -12,11 +13,14 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from backend.config import settings
 
 RAG_PROMPT_TEMPLATE = """You are an expert ANSYS simulation engineer.
-Use the following retrieved context to answer the question.
+Use the following retrieved context and conversation history to answer the question.
 If the context doesn't contain enough information, rely on your general ANSYS knowledge.
 
 Context:
 {context}
+
+Conversation History:
+{history}
 
 Question: {question}
 
@@ -25,6 +29,15 @@ Answer:"""
 
 def _format_docs(docs) -> str:
     return "\n\n".join(doc.page_content for doc in docs)
+
+def _format_history(history: list[dict] | None) -> str:
+    if not history:
+        return "No prior conversation history."
+    formatted = []
+    for msg in history:
+        role = "User" if msg.get("role") == "user" else "Assistant"
+        formatted.append(f"{role}: {msg.get('content')}")
+    return "\n".join(formatted)
 
 
 class RAGEngine:
@@ -67,19 +80,23 @@ class RAGEngine:
         prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
         self._retriever = self._vectorstore.as_retriever(search_kwargs={"k": 5})
 
-        # Modern LCEL RAG chain (replaces deprecated RetrievalQA)
         self._chain = (
-            {"context": self._retriever | _format_docs, "question": RunnablePassthrough()}
+            {
+                "context": itemgetter("question") | self._retriever | _format_docs,
+                "question": itemgetter("question"),
+                "history": itemgetter("history"),
+            }
             | prompt
             | llm
             | StrOutputParser()
         )
 
-    def query(self, question: str, k: int = 5) -> dict:
+    def query(self, question: str, history: list[dict] | None = None, k: int = 5) -> dict:
         """Run a question through the RAG pipeline.
 
         Args:
             question: The user's ANSYS-related question.
+            history: Optional list of previous chat messages.
             k: Number of context documents to retrieve.
 
         Returns:
@@ -88,7 +105,10 @@ class RAGEngine:
         if self._chain is None:
             self.initialize()
 
-        answer = self._chain.invoke(question)
+        answer = self._chain.invoke({
+            "question": question,
+            "history": _format_history(history)
+        })
 
         # Retrieve source metadata separately
         sources = []

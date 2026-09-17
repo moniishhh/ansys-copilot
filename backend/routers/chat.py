@@ -1,6 +1,6 @@
 """Router for the /chat endpoint — general ANSYS Q&A via RAG."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from backend.services.rag_engine import RAGEngine
@@ -23,7 +23,7 @@ class ChatResponse(BaseModel):
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(request: ChatRequest, fastapi_request: Request) -> ChatResponse:
     """Answer an ANSYS-related question using the RAG pipeline.
 
     Args:
@@ -33,8 +33,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
         AI-generated answer with source document references.
     """
     try:
-        rag = RAGEngine()
-        result = rag.query(request.message)
+        rag = fastapi_request.app.state.rag_engine
+        result = rag.query(request.message, history=request.conversation_history)
         return ChatResponse(response=result["answer"], sources=result.get("sources", []))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

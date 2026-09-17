@@ -3,8 +3,8 @@
 from pathlib import Path
 
 from langchain.schema import Document
-from langchain_community.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from backend.config import settings
 
@@ -21,9 +21,8 @@ def create_embeddings(docs: list[Document]) -> Chroma:
     persist_dir = Path(settings.chroma_persist_dir)
     persist_dir.mkdir(parents=True, exist_ok=True)
 
-    embeddings = OpenAIEmbeddings(
-        model=settings.embedding_model,
-        openai_api_key=settings.openai_api_key,
+    embeddings = HuggingFaceEmbeddings(
+        model_name=settings.embedding_model,
     )
 
     vectorstore = Chroma.from_documents(
@@ -45,9 +44,8 @@ def query_similar(query: str, k: int = 5) -> list[Document]:
     Returns:
         List of the most similar ``Document`` objects.
     """
-    embeddings = OpenAIEmbeddings(
-        model=settings.embedding_model,
-        openai_api_key=settings.openai_api_key,
+    embeddings = HuggingFaceEmbeddings(
+        model_name=settings.embedding_model,
     )
 
     vectorstore = Chroma(
