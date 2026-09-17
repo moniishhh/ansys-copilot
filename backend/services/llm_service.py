@@ -1,25 +1,43 @@
-"""LLM interaction layer using Google Gemini via LangChain."""
+"""LLM interaction layer using Azure AI Foundry via LangChain."""
 
 from langchain_core.messages import HumanMessage
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import AzureChatOpenAI
 
 from backend.config import settings
 
 
+def create_chat_model() -> AzureChatOpenAI:
+    """Create the Azure-hosted chat model shared by generation and RAG."""
+    if not all((
+        settings.azure_openai_api_key,
+        settings.azure_openai_endpoint,
+        settings.azure_openai_deployment,
+    )):
+        raise RuntimeError(
+            "AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, and "
+            "AZURE_OPENAI_DEPLOYMENT must be configured."
+        )
+
+    return AzureChatOpenAI(
+        azure_deployment=settings.azure_openai_deployment,
+        azure_endpoint=settings.azure_openai_endpoint,
+        api_key=settings.azure_openai_api_key,
+        api_version=settings.azure_openai_api_version,
+        # Azure reasoning models use their default temperature and the newer
+        # max_completion_tokens request field.
+        max_completion_tokens=settings.max_tokens,
+    )
+
+
 class LLMService:
-    """Thin wrapper around LangChain's ChatGoogleGenerativeAI client.
+    """Thin wrapper around the configured Azure AI Foundry deployment.
 
     Provides a simple ``generate`` interface used by other services.
     """
 
     def __init__(self) -> None:
-        self._llm = ChatGoogleGenerativeAI(
-            model=settings.model_name,
-            temperature=settings.temperature,
-            max_output_tokens=settings.max_tokens,
-            google_api_key=settings.gemini_api_key,
-        )
+        self._llm = create_chat_model()
 
     def generate(self, prompt: str, system_prompt: str = "") -> str:
         """Send a prompt to the LLM and return the response text.
@@ -31,8 +49,7 @@ class LLMService:
         Returns:
             The model's text response.
         """
-        # Gemini works best with a single unified prompt;
-        # prepend any system instruction directly into the message.
+        # Keep one unified prompt so all service paths behave consistently.
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{prompt}"
         else:

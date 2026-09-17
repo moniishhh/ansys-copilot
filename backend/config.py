@@ -8,10 +8,11 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    # LLM settings
-    gemini_api_key: str = ""
-    model_name: str = "gemini-2.5-flash"
-    temperature: float = 0.1
+    # Azure AI Foundry / Azure OpenAI settings
+    azure_openai_api_key: str = ""
+    azure_openai_endpoint: str = ""
+    azure_openai_api_version: str = "2024-10-21"
+    azure_openai_deployment: str = "gpt-5.4"
     max_tokens: int = 4096
 
     # Embedding & vector store settings

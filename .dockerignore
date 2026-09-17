@@ -1,0 +1,15 @@
+.git
+.github
+.env
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+chroma_db
+docs
+scripts
+vercel.json
+docker-compose.yml
+frontend/node_modules
+frontend/dist

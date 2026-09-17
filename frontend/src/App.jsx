@@ -5,7 +5,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { Send, Copy, Check, Trash2, X, AlertCircle } from 'lucide-react'
 import { FloatingPathsBackground } from './components/FloatingPathsBackground'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
 const MODES = [
   { id: 'chat',         label: 'General Q&A',    short: 'Ask'     },
@@ -715,7 +715,7 @@ export default function App() {
       } else if (mode === 'apdl' || mode === 'pymapdl') {
         const res = await fetch(`${API_BASE}/generate-script`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ description: text, language: mode === 'apdl' ? 'APDL' : 'PyMAPDL', analysis_type: extraFields.analysis_type }),
+          body: JSON.stringify({ description: text, script_type: mode, analysis_type: extraFields.analysis_type }),
         })
         if (!res.ok) throw new Error(`Server ${res.status}`)
         const d = await res.json()

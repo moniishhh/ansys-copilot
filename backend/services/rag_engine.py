@@ -1,16 +1,18 @@
 """RAG engine using LangChain, HuggingFace embeddings, and ChromaDB for ANSYS knowledge retrieval."""
 
+import json
 from operator import itemgetter
 from pathlib import Path
 
 from langchain_chroma import Chroma
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from backend.config import settings
+from backend.services.llm_service import create_chat_model
 
 RAG_PROMPT_TEMPLATE = """You are an expert ANSYS simulation engineer.
 Use the following retrieved context and conversation history to answer the question.
@@ -70,12 +72,20 @@ class RAGEngine:
             persist_directory=str(persist_dir),
         )
 
-        llm = ChatGoogleGenerativeAI(
-            model=settings.model_name,
-            temperature=settings.temperature,
-            max_output_tokens=settings.max_tokens,
-            google_api_key=settings.gemini_api_key,
-        )
+        # Populate a fresh cloud instance from the bundled starter knowledge.
+        if self._vectorstore._collection.count() == 0:
+            starter_file = Path("backend/knowledge_base/data/starter_knowledge.json")
+            if starter_file.exists():
+                records = json.loads(starter_file.read_text(encoding="utf-8"))
+                self._vectorstore.add_documents([
+                    Document(
+                        page_content=record["content"],
+                        metadata={"source": record["title"], "document_id": record["id"]},
+                    )
+                    for record in records
+                ])
+
+        llm = create_chat_model()
 
         prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
         self._retriever = self._vectorstore.as_retriever(search_kwargs={"k": 5})
